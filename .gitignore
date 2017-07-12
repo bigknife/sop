@@ -161,3 +161,6 @@ tramp
 .\#*
 
 # End of https://www.gitignore.io/api/macos,linux,scala,ensime,windows,intellij,sbt
+
+# local publish
+project/PublishCommand.scala
