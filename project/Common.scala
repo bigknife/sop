@@ -1,11 +1,12 @@
 import sbt._, Keys._
 import Dependencies._
+import bintray.BintrayKeys._
 
 object Common {
 
   // common settings
   lazy val settings = Seq(
-    organization := "barcsys",
+    organization := "bigknife.sop",
     scalaVersion := "2.12.4",
     crossScalaVersions := Seq("2.11.12", "2.12.4"),
     resolvers ++= Seq(
@@ -74,7 +75,9 @@ object Common {
       else Some(resolver.barcsys.release)
     },
     */
-    addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.4")
+    addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.4"),
+    licenses += ("Apache-2.0", url("https://opensource.org/licenses/Apache-2.0")),
+    bintrayRepository := "maven"
   )
 
   object prj {

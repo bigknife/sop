@@ -2,6 +2,7 @@
   * The definition of *ALL Dependencies*
   */
 import sbt._, Keys._
+import bintray.BintrayKeys._
 
 object Dependencies {
   case class Dpd(groupId: String,
@@ -57,8 +58,7 @@ object Dependencies {
     lazy val local = "local maven repository" at "file://" + Path.userHome.absolutePath + "/.m2/repository"
 
     object credential {
-      lazy val weihui  = Credentials(Path.userHome / ".dev" / "weihui.credentials")
-      lazy val barcsys = Credentials(Path.userHome / ".dev" / "barcsys.credentials")
+      lazy val jfrog  = Credentials(Path.userHome / ".dev" / "jfrog.credentials")
     }
   }
 }
