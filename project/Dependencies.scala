@@ -17,43 +17,30 @@ object Dependencies {
   // all dependencies
   object all {
     object versions {
-      val catsNormal    = "1.0.0-RC2"
-      val catsEffect    = "0.5"
-      val catsMtl       = "0.0.2"
-      val catsMouse     = "0.12"
-      val catsMachinist = "0.6.2"
+      val catsNormal    = "1.0.1"
+      val catsEffect    = "1.0.0-RC"
       val scalameta     = "1.8.0"
+      val scalatest = "3.0.5"
     }
     lazy val cats = {
-      Seq("cats-core", "cats-macros", "cats-kernel", "cats-core", "cats-free" /*,
-          "cats-effect",
-          "cats-mtl-core",
-          "mouse"*/ )
+      Seq("cats-core", "cats-free")
         .map({
           case x if x == "cats-effect"   ⇒ Dpd("org.typelevel", x, versions.catsEffect)
-          case x if x == "cats-mtl-core" ⇒ Dpd("org.typelevel", x, versions.catsMtl)
-          case x if x == "mouse"         ⇒ Dpd("org.typelevel", x, versions.catsMouse)
           case x                         ⇒ Dpd("org.typelevel", x, versions.catsNormal)
         })
-        .map({
-          case x ⇒ x.libraryDependencies
-        })
+        .map(_.libraryDependencies)
     }
-
     lazy val scalameta = Dpd("org.scalameta", "scalameta", versions.scalameta).libraryDependencies
 
-    private lazy val catsOverrides = Seq("cats-core", "machinist")
-      .map({
-        case x if x == "machinist" ⇒ Dpd("org.typelevel", x, versions.catsMachinist)
-        case x                     ⇒ Dpd("org.typelevel", x, versions.catsNormal)
-      })
-      .map(_.libraryDependencies)
-
-    lazy val overrides = catsOverrides
+    lazy val scalatest = Seq(
+      Dpd("org.scalactic", "scalactic", versions.scalatest),
+      Dpd("org.scalatest", "scalatest", versions.scalatest, autoScalaVersion = true, configuration = "test")
+    ).map(_.libraryDependencies)
   }
 
   // resolvers
   object resolver {
+    /*
     object weihui {
       private val nexus = "http://nexus.weihui.com:8081"
       lazy val snapshot = "weihui_snapshot" at nexus + "/content/repositories/snapshots"
@@ -65,6 +52,7 @@ object Dependencies {
       lazy val snapshot = "barcsys_snapshot" at nexus + "/content/repositories/snapshots"
       lazy val release  = "barcsys_release" at nexus + "/content/repositories/releases"
     }
+    */
 
     lazy val local = "local maven repository" at "file://" + Path.userHome.absolutePath + "/.m2/repository"
 
