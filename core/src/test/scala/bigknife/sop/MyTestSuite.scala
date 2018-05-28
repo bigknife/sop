@@ -1,79 +1,32 @@
-package sop
-package test
+package bigknife.sop
 
-import cats.{Cartesian, Functor, Id}
+import java.text.{SimpleDateFormat => SDF}
+import java.util.Date
+
+import cats.Id
 import cats.data.Kleisli
-import cats.free.{FreeApplicative, Inject}
-import org.scalatest.FlatSpec
-import sop._
-import sop.test.Validation.{IsEmail, OverMaxLength}
 
-import scala.concurrent.Await
-import scala.language.higherKinds
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
 
-// Log ADT
-trait Log[F[_]] {
-  def debug(msg: String): Par[F, Unit]
-}
-object Log {
-  sealed trait Op[A]
-  final case class Debug(msg: String) extends Op[Unit]
 
-  class To[F[_]](implicit I: Inject[Op, F]) extends Log[F] {
-    def debug(msg: String): Par[F, Unit] = liftPar_T[Op, F, Unit](Debug(msg))
-  }
-  implicit def to[F[_]](implicit I: Inject[Op, F]): Log[F] = new To[F]
-  def apply[F[_]](implicit L: Log[F]): Log[F]              = L
-}
 
-// Validation ADT
-trait Validation[F[_]] {
-  def isEmail(addr: String): Par[F, Boolean]
-  def overMaxLength(str: String, maxLength: Int): Par[F, Boolean]
-}
-object Validation {
-  sealed trait Op[A]
-  final case class IsEmail(addr: String)                      extends Op[Boolean]
-  final case class OverMaxLength(str: String, maxLength: Int) extends Op[Boolean]
-
-  class To[F[_]](implicit I: Inject[Op, F]) extends Validation[F] {
-    override def isEmail(addr: String): Par[F, Boolean] =
-      liftPar_T[Op, F, Boolean](IsEmail(addr))
-
-    override def overMaxLength(str: String, maxLength: Int): Par[F, Boolean] =
-      liftPar_T[Op, F, Boolean](OverMaxLength(str, maxLength))
-  }
-  implicit def to[F[_]](implicit I: Inject[Op, F]): Validation[F] = new To[F]
-  def apply[F[_]](implicit V: Validation[F])                      = V
-}
-
-class sop_test extends FlatSpec{
-  "SOP" should "Build Pure FP Seq Over Par" in {
-    sop_app.test()
-  }
-}
-object sop_app {
-  import Log._
-  import java.text.{SimpleDateFormat => SDF}
-  import java.util.Date
-
-  import scala.concurrent.ExecutionContext.Implicits.global
-  import scala.concurrent.Future
-  import scala.concurrent.duration._
+trait MyTestSuite {
   def now(): String = new SDF("yyyyMMdd-HH:mm:ss,SSS").format(new Date())
 
   val log: Log[Log.Op]                      = Log[Log.Op]
   val validation: Validation[Validation.Op] = Validation[Validation.Op]
 
-  val logIdInterpreter = new NT[Log.Op, Id] {
+  val logIdInterpreter: NT[Log.Op, Id] = new NT[Log.Op, Id] {
     override def apply[A](fa: Log.Op[A]): Id[A] = fa match {
-      case Debug(str) ⇒ println(s"[DEBUG] $str")
+      case Log.Debug(str) ⇒ println(s"[DEBUG] $str")
     }
   }
-  val logIdParInterpreter = new NT[Log.Op, Kleisli[Future, Any, ?]] {
+  val logIdParInterpreter: NT[Log.Op, Kleisli[Future, Any, ?]] = new NT[Log.Op, Kleisli[Future, Any, ?]] {
 
-    override def apply[A](fa: Op[A]): Kleisli[Future, Any, A] = fa match {
-      case Debug(msg) ⇒
+    override def apply[A](fa: Log.Op[A]): Kleisli[Future, Any, A] = fa match {
+      case Log.Debug(msg) ⇒
         Kleisli { _: Any ⇒
           Future {
             println(s"[DEBUG] [${now()}] $msg")
@@ -81,38 +34,40 @@ object sop_app {
         }
     }
   }
-  val validationSeqInterpreter = new NT[Validation.Op, Id] {
+
+  val validationSeqInterpreter: NT[Validation.Op, Id] = new NT[Validation.Op, Id] {
     override def apply[A](fa: Validation.Op[A]): Id[A] = fa match {
-      case IsEmail(addr) ⇒
-        val ret = addr.contains("@") && addr.contains(".")
-        println(s"$addr is email? $ret")
+      case Validation.IsEmail(address) ⇒
+        val ret = address.contains("@") && address.contains(".")
+        println(s"$address is email? $ret")
         Thread.sleep(1000)
         ret
-      case OverMaxLength(addr, maxLength) ⇒
-        val ret = addr.length <= maxLength
-        println(s"$addr is over max length($maxLength)? $ret")
+      case Validation.OverMaxLength(address, maxLength) ⇒
+        val ret = address.length <= maxLength
+        println(s"$address is over max length($maxLength)? $ret")
         Thread.sleep(1000)
         ret
     }
   }
 
-  val validationParInterpreter = new NT[Validation.Op, Kleisli[Future, Any, ?]] {
+  val validationParInterpreter: NT[Validation.Op, Kleisli[Future, Any, ?]] =
+    new NT[Validation.Op, Kleisli[Future, Any, ?]] {
 
     override def apply[A](fa: Validation.Op[A]): Kleisli[Future, Any, A] = fa match {
-      case IsEmail(addr) ⇒
+      case Validation.IsEmail(address) ⇒
         Kleisli { x: Any ⇒
           Future {
-            val ret = addr.contains("@") && addr.contains(".")
-            println(s"${now()} validating IsEmail($addr): $ret")
+            val ret = address.contains("@") && address.contains(".")
+            println(s"${now()} validating IsEmail($address): $ret")
             Thread.sleep(1000)
             ret
           }
         }
-      case OverMaxLength(addr, maxLength) ⇒
+      case Validation.OverMaxLength(address, maxLength) ⇒
         Kleisli { x: Any ⇒
           Future {
-            val ret = addr.length <= maxLength
-            println(s"${now()} $addr is over max length($maxLength)? $ret")
+            val ret = address.length <= maxLength
+            println(s"${now()} $address is over max length($maxLength)? $ret")
             Thread.sleep(1000)
             ret
           }
@@ -180,10 +135,10 @@ object sop_app {
   }
 
   private[this] def testCoproduct(): Unit = {
-    import cats.data.Coproduct
+    import cats.data._
     import cats.implicits._
     import cats.syntax._
-    type ValidateLogApp[A] = Coproduct[Validation.Op, Log.Op, A]
+    type ValidateLogApp[A] = EitherK[Validation.Op, Log.Op, A]
     val coLog        = Log[ValidateLogApp]
     val coValidation = Validation[ValidateLogApp]
     import coLog._, coValidation._
@@ -226,7 +181,7 @@ object sop_app {
 
 
     def validationPar(str: String, maxLength: Int): Par[ValidateLogApp, Boolean] =
-      (isEmail(str) |@| overMaxLength(str, maxLength)).map[Boolean](_ && _)
+    (isEmail(str) |@| overMaxLength(str, maxLength)).map[Boolean](_ && _)
 
     def validate(str: String, maxLength: Int): SOP[ValidateLogApp, Boolean] =
       for {
@@ -243,8 +198,11 @@ object sop_app {
     //val interpreter: NT[ValidateLogApp, Id] = validationSeqInterpreter or logIdInterpreter
     //val b = program.foldMap[Kleisli[Future, Any, ?]](liftInterpreter[ValidateLogApp, Kleisli[Future, Any, ?]](interpreter))
     val b =
-      program.foldMap[Kleisli[Future, Any, ?]](liftInterpreter[ValidateLogApp, Kleisli[Future, Any, ?]](interpreter))
+    program.foldMap[Kleisli[Future, Any, ?]](liftInterpreter[ValidateLogApp, Kleisli[Future, Any, ?]](interpreter))
     val ret = Await.result(b.run(1), Duration.Inf)
     println(s"final ret is $ret")
   }
+
 }
+
+object MyTestSuite extends MyTestSuite
