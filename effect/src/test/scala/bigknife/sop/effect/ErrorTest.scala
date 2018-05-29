@@ -36,7 +36,7 @@ object ErrorTest extends App {
       override def log(a: String): cats.Id[Unit] = println(s"LOG: $a")
     }
 
-    implicit val logEitherHandler = new Log.Handler[({type λ[A] = Either[Throwable, A]})#λ /*Either[Throwable, ?]*/] {
+    implicit val logEitherHandler = new Log.Handler[Either[Throwable, ?]] {
       override def log(a: String): Either[Throwable, Unit] = Right(println(s"LOG: $a"))
     }
   }
@@ -44,10 +44,10 @@ object ErrorTest extends App {
   import error.implicits._
   import logHandler._
   import Stack._
-  val s = p.interpret[/*Either[Throwable, ?]*/({type λ[A] = Either[Throwable, A]})#λ]
+  val s = p.interpret[Either[Throwable, ?]]
   println(s)
 
-  val s1 = p2.interpret[/*Either[Throwable, ?]*/({type λ[A] = Either[Throwable, A]})#λ]
+  val s1 = p2.interpret[Either[Throwable, ?]]
   println(s1)
 
 }
@@ -118,54 +118,6 @@ object ErrorTest1 extends App {
         else Some(Right(user.copy(name = user.name + ":ACCEPTED")))
       }
     }
-    /*
-    implicit val stackME = new cats.MonadError[Stack, Throwable] {
-      def pure[A](x: A): Stack[A] = Stack { setting =>
-        Some(x)
-      }
-      def handleErrorWith[A](a: Stack[A])(f: Throwable => Stack[A]): Stack[A] = Stack { setting =>
-        try {
-          a(setting)
-        } catch {
-          case t: Throwable => f(t)(setting)
-        }
-      }
-      def raiseError[A](e: Throwable): Stack[A] = Stack { setting =>
-        //e ignored
-        None
-      }
-      def flatMap[A, B](a: Stack[A])(f: A => Stack[B]): Stack[B] = Stack { setting =>
-        a(setting) match {
-          case Some(x) => f(x)(setting)
-          case None    => None
-        }
-      }
-
-      def tailRecM[A, B](a: A)(f1: A => Stack[Either[A, B]]): Stack[B] = {
-        // setting => Option[B]
-        // setting => Stack[B](setting)
-
-        def go(setting: Setting,f: Stack[Either[A, B]]): Option[B] = {
-          //println(s"go...$a")
-          (f(setting)) match {
-            case None =>
-              //println("go none")
-              None
-            case Some(Left(a1)) =>
-              //println(s"go some left a1: ${a1.hashCode}")
-              go(setting,  f1(a1))
-            case Some(Right(b)) =>
-              //println(s"go some right b: $b")
-              Some(b)
-              //None
-          }
-        }
-        Stack {
-          setting => go(setting, f1(a))
-        }
-      }
-    }
-     */
   }
 
   import handlers._

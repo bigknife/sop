@@ -10,7 +10,7 @@ import cats.free.{Free, FreeApplicative}
 package object sop {
   type S[F[_], A]     = Free[F, A]
   type P[F[_], A]     = FreeApplicative[F, A]
-  type SP[F[_], A]    = S[({type T[B] = P[F, B]})#T, A] //S[P[F, ?], A]
+  type SP[F[_], A]    = S[sop.P[F, ?], A]
   type NT[F[_], G[_]] = F ~> G
 }
 
@@ -32,11 +32,11 @@ package sop {
   }
 
   private[sop] object SP {
-    def pure[F[_], A](a: A): SP[F, A] = S.pure[({type λ[B] = P[F, B]})#λ, A](a)
+    def pure[F[_], A](a: A): SP[F, A] = S.pure[sop.P[F, ?], A](a)
 
     def lift[F[_], A](fa: F[A]): SP[F, A] = S.lift(P.lift(fa))
     def inject[F[_], G[_], A](a: SP[F, A])(implicit I: InjectK[F, G]): SP[G, A] =
-      a.compile(new NT[/*P[F, ?]*/({type T[B] = P[F, B]})#T, /*P[G, ?]*/({type U[B] = P[G, B]})#U] {
+      a.compile(new NT[sop.P[F, ?], sop.P[G, ?]] {
         override def apply[B](b: P[F, B]): P[G, B] =
           b.compile(new NT[F, G] {
             override def apply[C](c: F[C]): G[C] = I.inj(c)
@@ -59,7 +59,7 @@ package sop {
 
   private[sop] trait SPInterpreterSyntax[F[_], A] {
     val spa: SP[F, A]
-    def interpret[M[_]: Monad](implicit nt: NT[/*P[F, ?]*/({type T[B] = P[F, B]})#T, M]): M[A] = spa.foldMap(nt)
+    def interpret[M[_]: Monad](implicit nt: NT[sop.P[F, ?], M]): M[A] = spa.foldMap(nt)
   }
 
   private[sop] trait PInterpreterSyntax[F[_], A] {
@@ -68,14 +68,14 @@ package sop {
   }
 
   private[sop] trait syntax {
-    implicit def liftSyntax[F[_], A](a: F[A])       = new LiftSyntax[F, A]    { val fa = a }
-    implicit def pInjectSyntax[F[_], A](a: P[F, A]) = new PInjectSyntax[F, A] { val pa = a }
-    implicit def spInterpreterSyntax[F[_], A](a: SP[F, A]) = new SPInterpreterSyntax[F, A] {val spa = a}
-    implicit def pInterpreterSyntax[F[_], A](a: P[F, A]) =new PInterpreterSyntax[F, A] {val pa = a}
+    implicit def liftSyntax[F[_], A](a: F[A])              = new LiftSyntax[F, A]          { val fa  = a }
+    implicit def pInjectSyntax[F[_], A](a: P[F, A])        = new PInjectSyntax[F, A]       { val pa  = a }
+    implicit def spInterpreterSyntax[F[_], A](a: SP[F, A]) = new SPInterpreterSyntax[F, A] { val spa = a }
+    implicit def pInterpreterSyntax[F[_], A](a: P[F, A])   = new PInterpreterSyntax[F, A]  { val pa  = a }
 
     implicit class PureSyntax[A](a: A) {
-      def pureP[F[_]]: P[F, A] = P.pure[F, A](a)
-      def pureS[F[_]]: S[F, A] = S.pure[F, A](a)
+      def pureP[F[_]]: P[F, A]   = P.pure[F, A](a)
+      def pureS[F[_]]: S[F, A]   = S.pure[F, A](a)
       def pureSP[F[_]]: SP[F, A] = SP.pure[F, A](a)
 
     }
@@ -83,14 +83,14 @@ package sop {
   //object syntax extends syntax
   private[sop] trait trans {
     implicit def p2sp[F[_], A](a: P[F, A]): SP[F, A] = S.lift(a)
-    implicit def liftNT[F[_], G[_]: Applicative](nt: NT[F, G]): NT[/*P[F, ?]*/({type T[A] = P[F, A]})#T, G] =
-      new NT[({type T[A] = P[F, A]})#T/*P[F, ?]*/, G] {
+    implicit def liftNT[F[_], G[_]: Applicative](nt: NT[F, G]): NT[sop.P[F, ?], G] =
+      new NT[sop.P[F, ?], G] {
         override def apply[A](a: P[F, A]): G[A] = a.foldMap(nt)
       }
   }
   //object trans extends trans
 
   object implicits extends syntax with trans
-  object syntax extends syntax
-  object trans extends trans
+  object syntax    extends syntax
+  object trans     extends trans
 }
