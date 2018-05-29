@@ -1,5 +1,9 @@
 # SOP
 
+core: [ ![Download](https://api.bintray.com/packages/bigknife/maven/core/images/download.svg) ](https://bintray.com/bigknife/maven/core/_latestVersion)
+
+effect: [ ![Download](https://api.bintray.com/packages/bigknife/maven/effect/images/download.svg) ](https://bintray.com/bigknife/maven/effect/_latestVersion)
+
 > Sequential computation over parallel computation
 
 It's a simplified tool for building pure FP programs in scala.
