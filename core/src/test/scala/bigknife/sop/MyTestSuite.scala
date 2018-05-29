@@ -9,7 +9,7 @@ import cats.data.Kleisli
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-
+import bigknife.sop.implicits._
 
 
 trait MyTestSuite {
@@ -101,12 +101,12 @@ trait MyTestSuite {
   private[this] def testSeqValidation(): Unit = {
     import validation._
     import cats.implicits._
-    def validationProgram(str: String, maxLength: Int): Par[Validation.Op, Boolean] =
+    def validationProgram(str: String, maxLength: Int): P[Validation.Op, Boolean] =
       (isEmail(str) |@| overMaxLength(str, maxLength)).map(_ && _)
     val ret: Id[Boolean] = validationProgram("songzenghui@gmail.com", 5).foldMap(validationSeqInterpreter)
     println(s"the final ret is $ret")
     println("--------use impilcit transformation to SOP------------")
-    def lift2SopProgram(str: String, maxLength: Int): SOP[Validation.Op, Boolean] = {
+    def lift2SopProgram(str: String, maxLength: Int): SP[Validation.Op, Boolean] = {
       for {
         a ← isEmail(str)
         b ← overMaxLength(str, maxLength)
@@ -125,7 +125,7 @@ trait MyTestSuite {
     import scala.concurrent.ExecutionContext.Implicits.global
     case object Dummy
 
-    def validationProgram(str: String, maxLength: Int): Par[Validation.Op, Boolean] =
+    def validationProgram(str: String, maxLength: Int): P[Validation.Op, Boolean] =
       (isEmail(str) |@| overMaxLength(str, maxLength)).map(_ && _)
     val retFunc: Kleisli[Future, Any, Boolean] =
       validationProgram("songzenghui@gmail.com", 5).foldMap[Kleisli[Future, Any, ?]](validationParInterpreter)
@@ -141,64 +141,25 @@ trait MyTestSuite {
     type ValidateLogApp[A] = EitherK[Validation.Op, Log.Op, A]
     val coLog        = Log[ValidateLogApp]
     val coValidation = Validation[ValidateLogApp]
-    import coLog._, coValidation._
 
-    /**
-      * Basically when the leftmost parameter of a higher kinded type needs to be partially applied,
-      * the compiler had a bug (SI-2712) that would prevent unification. This, in turn, makes the
-      * implicit not resolve. This was fixed by a plugin first, and then by a new compiler flag
-      * (-Ypartial-unification, only available in 2.11.9+/2.12).
-      * The plugin figures out your scala version and applies the correct fix
-      */
-    /*
-    implicit val functor = new Functor[Par[ValidateLogApp, ?]] {
-      override def map[A, B](fa: Par[ValidateLogApp, A])(f: (A) => B): Par[ValidateLogApp, B] = fa.map(f)
-    }
-     */
-    /*
-    implicit val cartesian = new Cartesian[Par[ValidateLogApp, ?]] {
-      override def product[A, B](fa: Par[ValidateLogApp, A], fb: Par[ValidateLogApp, B]): Par[ValidateLogApp, (A, B)] = fa.product(fb)
-    }
-     */
+    def validationPar(str: String, maxLength: Int): P[ValidateLogApp, Boolean] =
+    (coValidation.isEmail(str) |@| coValidation.overMaxLength(str, maxLength)).map[Boolean](_ && _)
 
-    /*
-    implicit def cartesian = new Cartesian[Par[ValidateLogApp, ?]] {
-      override def product[A, B](fa: Par[ValidateLogApp, A], fb: Par[ValidateLogApp, B]): Par[ValidateLogApp, (A, B)] =
-        fa.product(fb)
-    }
-    */
-
-
-
-    /*
-    implicit def _cartesian[F[_], G[_]] = new Cartesian[Par[Coproduct[F, G, ?], ?]] {
-      override def product[A, B](fa: Par[Coproduct[F, G, ?], A], fb: Par[Coproduct[F, G, ?], B]): Par[Coproduct[F, G, ?], (A, B)] =
-        fa.product(fb)
-    }
-    */
-
-
-
-
-    def validationPar(str: String, maxLength: Int): Par[ValidateLogApp, Boolean] =
-    (isEmail(str) |@| overMaxLength(str, maxLength)).map[Boolean](_ && _)
-
-    def validate(str: String, maxLength: Int): SOP[ValidateLogApp, Boolean] =
+    def validate(str: String, maxLength: Int): SP[ValidateLogApp, Boolean] =
       for {
-        _ ← debug(s"validate $str is a email and the max length 1")
-        _ ← debug(s"validate $str is a email and the max length 2")
-        _ ← debug(s"validate $str is a email and the max length 3")
+        _ ← coLog.debug(s"validate $str is a email and the max length 1")
+        _ ← coLog.debug(s"validate $str is a email and the max length 2")
+        _ ← coLog.debug(s"validate $str is a email and the max length 3")
         //b ← validation(str, maxLength)
         b ← validationPar(str, maxLength)
-        _ ← debug(s"validation result is $b")
+        _ ← coLog.debug(s"validation result is $b")
       } yield true
 
     val program                                                  = validate("songzenghui@gmail.com", 5)
-    val interpreter: NT[ValidateLogApp, Kleisli[Future, Any, ?]] = validationParInterpreter or logIdParInterpreter
-    //val interpreter: NT[ValidateLogApp, Id] = validationSeqInterpreter or logIdInterpreter
-    //val b = program.foldMap[Kleisli[Future, Any, ?]](liftInterpreter[ValidateLogApp, Kleisli[Future, Any, ?]](interpreter))
-    val b =
-    program.foldMap[Kleisli[Future, Any, ?]](liftInterpreter[ValidateLogApp, Kleisli[Future, Any, ?]](interpreter))
+    implicit val interpreter: NT[ValidateLogApp, Kleisli[Future, Any, ?]] =
+      validationParInterpreter or logIdParInterpreter
+
+    val b = program.foldMap(interpreter)
     val ret = Await.result(b.run(1), Duration.Inf)
     println(s"final ret is $ret")
   }
